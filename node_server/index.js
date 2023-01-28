@@ -3,6 +3,40 @@
 const dotenv = require('dotenv')
 const net = require('node:net');
 const { networkInterfaces } = require('os');
+const fs = require('fs');
+
+
+function writeJSONDataToFile(fileName, data) {
+    fs.stat(fileName, function (err, stat) {
+        const strData = data + "\n";
+
+        if (err == null) {
+            // console.log('File exists');
+
+            //write the actual data and end with newline
+            // var csv = json2csv(toCsv) + newLine;
+            // console.log("csv", csv);
+            fs.appendFile(fileName, strData, function (err) {
+                if (err) {
+                    throw err;
+                }
+                // console.log('The "data to append" was appended to file!');
+            });
+        } else {
+            //write the headers and newline
+            console.log('New file, just writing headers');
+            // fields = fields + newLine;
+    
+            fs.writeFile(fileName, strData, function (err) {
+                if (err) {
+                    throw err;
+                }
+                // console.log('file saved');
+            });
+        }
+    });
+}
+
 
 const nets = networkInterfaces();
 const results = Object.create(null); // Or just '{}', an empty object
@@ -63,6 +97,8 @@ function main() {
             try {
                 const parsedData = JSON.parse(data.toString());
                 // JSON.parse()
+
+                // writeJSONDataToFile("rs485_dump_01", parsedData.payload.data);
                 console.log("parsedData", parsedData)
             } catch(e) {
                 console.error("parsing error", e);
