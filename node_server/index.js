@@ -4,6 +4,7 @@ const dotenv = require('dotenv')
 const net = require('node:net');
 const { networkInterfaces } = require('os');
 const fs = require('fs');
+const { parseModbusPacket, getPacketToSend } = require('./modbusPacket');
 
 
 function writeJSONDataToFile(fileName, data) {
@@ -56,34 +57,6 @@ for (const name of Object.keys(nets)) {
 }
 
 
-/**
- * Calculates the buffers CRC16.
- *
- * @param {Buffer} buffer the data buffer.
- * @return {number} the calculated CRC16.
- * 
- * Source: github.com/yaacov/node-modbus-serial
- */
-function crc16(buffer) {
-    var crc = 0xFFFF;
-    var odd;
-
-    for (var i = 0; i < buffer.length; i++) {
-        crc = crc ^ buffer[i];
-
-        for (var j = 0; j < 8; j++) {
-            odd = crc & 0x0001;
-            crc = crc >> 1;
-            if (odd) {
-                crc = crc ^ 0xA001;
-            }
-        }
-    }
-
-    return crc;
-};
-
-
 function main() {
     const config = dotenv.config().parsed;
     console.log("config", config)
@@ -99,6 +72,8 @@ function main() {
 
                 // writeJSONDataToFile("rs485_dump_01", parsedData.payload.data);
                 console.log("parsedData", parsedData)
+                
+                parseModbusPacket(parsedData.payload.data);
             } catch(e) {
                 console.error("parsing error", e);
             }
@@ -108,7 +83,7 @@ function main() {
             console.log(" ");
             let idBuff = Buffer.from([0xcc, 0x00]);
             // let messageBuff = Buffer.from("kaka");
-            let messageBuff = Buffer.from([0xFF, 0x03, 0x00, 0x0B, 0x00, 0x01, 0xE0, 0x16]);
+            let messageBuff = getPacketToSend();
             let buf = Buffer.concat([idBuff, messageBuff]);
             socket.write(buf)
             console.log("send data: ", buf);
