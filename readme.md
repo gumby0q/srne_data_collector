@@ -10,3 +10,9 @@ Reading rs485 packets is done on `esp32` SoC.
 
 #### Telegraf (if you need it)
 https://github.com/influxdata/telegraf
+
+
+## See this example
+https://github.com/suletom/EASUN-ISOLAR-SMX-II-CONTROL
+
+https://github.com/suletom/EASUN-ISOLAR-SMX-II-CONTROL/blob/main/commands.json

@@ -85,7 +85,6 @@ function crc16(buffer) {
 
 
 function main() {
-
     const config = dotenv.config().parsed;
     console.log("config", config)
     console.log("ip", results)
@@ -104,23 +103,57 @@ function main() {
                 console.error("parsing error", e);
             }
         })
-        socket.end('goodbye\n');
+
+        let intId = setInterval(() => {
+            console.log(" ");
+            let idBuff = Buffer.from([0xcc, 0x00]);
+            // let messageBuff = Buffer.from("kaka");
+            let messageBuff = Buffer.from([0xFF, 0x03, 0x00, 0x0B, 0x00, 0x01, 0xE0, 0x16]);
+            let buf = Buffer.concat([idBuff, messageBuff]);
+            socket.write(buf)
+            console.log("send data: ", buf);
+            console.log(" ");
+        }, 3000)
+        
+        socket.on("end", (data) => {
+            console.log("\nsocket On end")
+            clearInterval(intId);
+        });
+        
+        socket.on("error", (e) => {
+            console.log("\nsocket On error:", e)
+            clearInterval(intId);
+        });
+
+        socket.on("close", (e) => {
+            console.log("\nsocket On close:", e)
+            clearInterval(intId);
+        });
+        // socket.end('\ngoodbye\n');
     }).on('error', (err) => {
         // Handle errors here.
         // throw err;
         console.error("createServer Error", err);
     });
+
+    server.on("connection", (e) => {
+        console.log("on connection !!!");
+    });
+    server.on("drop", (e) => {
+        console.log("on drop !!!");
+    });
     
     // const controller = new AbortController();
-    // server.on('error', (e) => {
-    //     if (e.code === 'EADDRINUSE') {
-    //       console.error('Address in use, retrying...');
-    //       setTimeout(() => {
-    //         server.close();
-    //         server.listen(PORT, HOST);
-    //       }, 1000);
-    //     }
-    //   });
+    server.on('error', (e) => {
+        console.log("\n server On error:", e)
+        // if (e.code === 'EADDRINUSE') {
+        //     console.error('Address in use, retrying...');
+        //     setTimeout(() => {
+        //         server.close();
+        //         server.listen(PORT, HOST);
+        //     }, 1000);
+        // }
+    });
 
     // Grab an arbitrary unused port.
     server.listen({
@@ -134,4 +167,3 @@ function main() {
 }
 
 main();
-
