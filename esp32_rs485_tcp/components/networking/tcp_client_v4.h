@@ -12,6 +12,6 @@ struct TCPItem {
 typedef struct TCPItem TCPItem_t;
 
 
-void tcp_client_init(QueueHandle_t tcp_sending_queue);
+void tcp_client_init(QueueHandle_t tcp_sending_queue, QueueHandle_t tcp_receiving_queue);
 
 #endif

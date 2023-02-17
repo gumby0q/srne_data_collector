@@ -1,3 +1,4 @@
+
 /* Uart Events Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -72,6 +73,8 @@ extern uint8_t mac_base[6];
 /* ------------------------------------------------------->>> */
 static const int tcp_sending_queue_len = 5;     // Size of msg_queue
 QueueHandle_t tcp_sending_queue;
+static const int tcp_receiving_queue_len = 5;     // Size of msg_queue
+QueueHandle_t tcp_receiving_queue;
 // tcp_sending_queue = xQueueCreate(tcp_sending_queue_len, sizeof(TCPItem_t));
 /* -------------------------------------------------------<<< */
 // tcp_sending_queue = xQueueCreate(tcp_sending_queue_len, sizeof(Message_t));
@@ -95,6 +98,41 @@ QueueHandle_t tcp_sending_queue;
 //     }
 // }
 
+
+TCPItem_t receive_msg_rs;
+
+static void rs485_send(const int uart_num, uint8_t * data, uint8_t length)
+{
+    if (uart_write_bytes(uart_num, data, length) != length) {
+        ESP_LOGE(TAG, "Send data critical failure.");
+        // add your code to handle sending failure here
+        // abort();
+    }
+}
+
+volatile uint8_t timeoutFlag = 0;
+
+static void uart_send_task(void *arg)
+{
+    const int uart_num = ECHO_UART_PORT;
+
+    vTaskDelay(2000 / portTICK_PERIOD_MS);
+    while (1)
+    {
+        // rs485_send(uart_num, (uint8_t * )"\r\n Hi there \r\n", 14);
+        // rs485_send(uart_num, (uint8_t * )"Hilol", 14);
+        // rs485_send(uart_num, (uint8_t * )"Hilol", 5);
+        
+        // vTaskDelay(2000 / portTICK_PERIOD_MS);
+        if (xQueueReceive(tcp_receiving_queue, (void *)&receive_msg_rs, 1) == pdTRUE)
+        {
+            uint8_t buff[256] = {0};
+            memcpy(buff, &receive_msg_rs.data, receive_msg_rs.data_length);
+            rs485_send(uart_num, buff, receive_msg_rs.data_length);
+        }
+    }
+    vTaskDelete(NULL);
+}
 
 TCPItem_t new_msg;
 char message_data[350];
@@ -200,7 +238,7 @@ static void echo_task(void *arg)
 
                 int len = sprintf(message_data, "{\
 \"uuid\": \"%02x%02x%02x%02x%02x%02x\",\
-\"type\": \"RS485_SNIFF\",\
+\"type\": \"RS485_RECEIVE\",\
 \"payload\": {\"data\": \"%s\"}}", mac_base[0], mac_base[1], mac_base[2], mac_base[3], mac_base[4], mac_base[5], _data);
 
                 new_msg.data_length = len;
@@ -224,14 +262,17 @@ static void echo_task(void *arg)
 void app_main(void)
 {
     tcp_sending_queue = xQueueCreate(tcp_sending_queue_len, sizeof(TCPItem_t));
+    tcp_receiving_queue = xQueueCreate(tcp_receiving_queue_len, sizeof(TCPItem_t));
     
 
     wifi_init();
     ESP_LOGI("main", "wifi_init() done");
 
-    tcp_client_init(tcp_sending_queue);
+    tcp_client_init(tcp_sending_queue, tcp_receiving_queue);
     ESP_LOGI("main", "tcp_client_init() done");
 
     //A uart read/write example without event queue;
     xTaskCreate(echo_task, "uart_echo_task", ECHO_TASK_STACK_SIZE, NULL, ECHO_TASK_PRIO, NULL);
+    xTaskCreate(uart_send_task, "uart_send_task", ECHO_TASK_STACK_SIZE, NULL, ECHO_TASK_PRIO, NULL);
 }
+

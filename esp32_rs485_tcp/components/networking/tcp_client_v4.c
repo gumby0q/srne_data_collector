@@ -68,6 +68,7 @@ static const char *TAG = "tcp_client";
 
 
 static QueueHandle_t _tcp_sending_queue;
+static QueueHandle_t _tcp_receiving_queue;
 
 
 
@@ -162,11 +163,12 @@ static QueueHandle_t _tcp_sending_queue;
 
 
 TCPItem_t new_msg2;
+TCPItem_t receive_msg;
 
 
 static void tcp_client(void *arg)
 {
-    // char rx_buffer[128];
+    char rx_buffer[128];
     char host_ip[] = HOST_IP_ADDR;
     int addr_family = 0;
     int ip_protocol = 0;
@@ -229,30 +231,43 @@ static void tcp_client(void *arg)
                     {
                     }
 
-                    // int err = send(sock, payload, strlen(payload), 0);
-                    // if (err < 0) {
-                    //     ESP_LOGE(TAG, "Error occurred during sending: errno %d", errno);
-                    //     break;
-                    // }
-
                     // int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-                    // // Error occurred during receiving
-                    // if (len < 0) {
-                    //     ESP_LOGE(TAG, "recv failed: errno %d", errno);
-                    //     break;
-                    // }
-                    // // Data received
-                    // else {
-                    //     rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
-                    //     ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
-                    //     ESP_LOGI(TAG, "%s", rx_buffer);
-                    // }
+                    int len = recv(sock, rx_buffer, sizeof(rx_buffer) - 1, MSG_DONTWAIT);
+                    // Error occurred during receiving
+                    if (len < 0) {
+                        if (errno == 11) {
+
+                        } else {
+                            ESP_LOGE(TAG, "recv failed: errno %d", errno);
+                            break;
+                        }
+                    }
+                    // Data received
+                    else {
+                        if (len == 0) {
+                            ESP_LOGI(TAG, "Received 0 bytes from %s:", host_ip);
+                        } else {
+                            rx_buffer[len] = 0; // Null-terminate whatever we received and treat like a string
+                            ESP_LOGI(TAG, "Received %d bytes from %s:", len, host_ip);
+                            ESP_LOGI(TAG, "%s", rx_buffer);
+                            if (rx_buffer[0] == 0xcc) {
+                                if (rx_buffer[1] == 0x00) {
+                                    receive_msg.data_length = len-2;
+                                    memcpy(&receive_msg.data, &rx_buffer[2], receive_msg.data_length);
+                                    if (xQueueSend(_tcp_receiving_queue, (void *)&receive_msg, 2) != pdTRUE)
+                                    {
+                                        printf("ERROR: could not put item on _tcp_receiving_queue queue.\n");
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 ESP_LOGW(TAG, "Socket unable to connect: errno %d", errno);
             }
         } else {
-            ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
+            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
         }
 
         if (sock != -1) {
@@ -266,8 +281,9 @@ static void tcp_client(void *arg)
 }
 
 
-void tcp_client_init(QueueHandle_t tcp_sending_queue) {
+void tcp_client_init(QueueHandle_t tcp_sending_queue, QueueHandle_t tcp_receiving_queue) {
     _tcp_sending_queue = tcp_sending_queue;
+    _tcp_receiving_queue = tcp_receiving_queue;
 
     // xTaskCreate(udp_alive_task, "udp_alive", 4096, NULL, 5, NULL);
     // ESP_LOGI(TAG, "udp_alive_task start 3");
